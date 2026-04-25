@@ -5,6 +5,23 @@ import (
 	"math"
 )
 
+// stereoToMono16LE takes interleaved 16-bit little-endian stereo PCM and
+// returns mono PCM by averaging the two channels per sample.
+func stereoToMono16LE(stereo []byte) []byte {
+	if len(stereo) < 4 {
+		return nil
+	}
+	frames := len(stereo) / 4
+	mono := make([]byte, frames*2)
+	for i := 0; i < frames; i++ {
+		l := int32(int16(binary.LittleEndian.Uint16(stereo[i*4 : i*4+2])))
+		r := int32(int16(binary.LittleEndian.Uint16(stereo[i*4+2 : i*4+4])))
+		avg := int16((l + r) / 2)
+		binary.LittleEndian.PutUint16(mono[i*2:], uint16(avg))
+	}
+	return mono
+}
+
 func bytesToInt16s(data []byte) []int16 {
 	int16s := make([]int16, len(data)/2)
 	for i := range int16s {

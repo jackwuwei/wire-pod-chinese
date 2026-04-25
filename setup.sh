@@ -86,21 +86,37 @@ fi
 echo "Checks have passed!"
 echo
 
+function setupEdgeTTSVenv() {
+    echo
+    echo "Setting up Python venv for edge-tts (./chipper/.venv)"
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "python3 not found on PATH; skipping edge-tts venv setup."
+        return 0
+    fi
+    rm -rf ./chipper/.venv
+    python3 -m venv ./chipper/.venv
+    ./chipper/.venv/bin/pip install --upgrade pip
+    ./chipper/.venv/bin/pip install edge-tts
+    echo "edge-tts installed at ./chipper/.venv/bin/edge-tts"
+    echo
+}
+
 function getPackages() {
     echo "Installing required packages"
     if [[ ${TARGET} == "debian" ]]; then
         apt update -y
-        apt install -y wget openssl net-tools libsox-dev libopus-dev make iproute2 xz-utils libopusfile-dev pkg-config gcc curl g++ unzip avahi-daemon git libasound2-dev libsodium-dev cmake lld
+        apt install -y wget openssl net-tools libsox-dev libopus-dev make iproute2 xz-utils libopusfile-dev pkg-config gcc curl g++ unzip avahi-daemon git libasound2-dev libsodium-dev cmake lld python3 python3-venv python3-pip
         elif [[ ${TARGET} == "arch" ]]; then
         pacman -Sy --noconfirm
-        sudo pacman -S --noconfirm wget openssl net-tools sox opus make iproute2 opusfile curl unzip avahi git libsodium go pkg-config cmake lld
+        sudo pacman -S --noconfirm wget openssl net-tools sox opus make iproute2 opusfile curl unzip avahi git libsodium go pkg-config cmake lld python python-pip
         elif [[ ${TARGET} == "fedora" ]]; then
         dnf update
-        dnf install -y wget openssl net-tools sox opus make opusfile curl unzip avahi git libsodium-devel cmake lld
+        dnf install -y wget openssl net-tools sox opus make opusfile curl unzip avahi git libsodium-devel cmake lld python3 python3-pip
         elif [[ ${TARGET} == "darwin" ]]; then
         sudo -u $SUDO_USER brew update
-        sudo -u $SUDO_USER brew install wget pkg-config opus opusfile cmake lld
+        sudo -u $SUDO_USER brew install wget pkg-config opus opusfile cmake lld python3
     fi
+    setupEdgeTTSVenv
     touch ./vector-cloud/packagesGotten
     echo
     echo "Installing golang binary package"
@@ -144,6 +160,7 @@ function getSTT() {
         echo "2: Picovoice Leopard (local, usage collected, accurate, account signup required)"
         echo "3: VOSK (local, accurate, multilanguage, fast, recommended)"
         echo "4: Whisper (local, accurate, multilanguage, recommended ONLY for more powerful hardware, please don't run on a Pi)"
+        echo "5: Sherpa-Onnx SenseVoice (local, multilingual incl. zh/en/ja/ko/yue, recommended for Chinese)"
         echo
         read -p "Enter a number (3): " sttServiceNum
         if [[ ! -n ${sttServiceNum} ]]; then
@@ -161,6 +178,8 @@ function getSTT() {
             sttService="vosk"
             elif [[ ${sttServiceNum} == "4" ]]; then
             sttService="whisper"
+            elif [[ ${sttServiceNum} == "5" ]]; then
+            sttService="sherpa-onnx"
         else
             echo
             echo "Choose a valid number, or just press enter to use the default number."
@@ -263,6 +282,36 @@ function getSTT() {
 	cmake --build build_go --config Release
         cd ${origDir}
         echo "export WHISPER_MODEL=$whispermodel" >> ./chipper/source.sh
+        elif [[ ${sttService} == "sherpa-onnx" ]]; then
+        echo "export STT_SERVICE=sherpa-onnx" >> ./chipper/source.sh
+        origDir="$(pwd)"
+        SHERPA_MODEL_VER="2024-07-17"
+        SHERPA_MODEL_DIR="sherpa-onnx-sense-voice-zh-en-ja-ko-yue-${SHERPA_MODEL_VER}"
+        SHERPA_MODEL_ARCHIVE="${SHERPA_MODEL_DIR}.tar.bz2"
+        SHERPA_MODEL_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/${SHERPA_MODEL_ARCHIVE}"
+        SHERPA_MODELS_DIR="${origDir}/sherpa-onnx/models"
+        SHERPA_TARGET_DIR="${SHERPA_MODELS_DIR}/sense-voice"
+        if [[ ! -f "${SHERPA_TARGET_DIR}/model.int8.onnx" ]]; then
+            echo "Getting sherpa-onnx SenseVoice model (${SHERPA_MODEL_VER})"
+            mkdir -p "${SHERPA_MODELS_DIR}"
+            cd "${SHERPA_MODELS_DIR}"
+            rm -rf "${SHERPA_MODEL_DIR}" "${SHERPA_MODEL_ARCHIVE}" sense-voice
+            wget -q --show-progress --no-check-certificate "${SHERPA_MODEL_URL}"
+            tar -xjf "${SHERPA_MODEL_ARCHIVE}"
+            rm -f "${SHERPA_MODEL_ARCHIVE}"
+            mv "${SHERPA_MODEL_DIR}" sense-voice
+            cd "${origDir}"
+        else
+            echo "sherpa-onnx model already present at ${SHERPA_TARGET_DIR}, skipping download"
+        fi
+        cd "${origDir}/chipper"
+        /usr/local/go/bin/go get github.com/k2-fsa/sherpa-onnx-go/sherpa_onnx
+        if [[ ${TARGET} == "darwin" ]]; then
+            /usr/local/go/bin/go get github.com/k2-fsa/sherpa-onnx-go-macos
+        else
+            /usr/local/go/bin/go get github.com/k2-fsa/sherpa-onnx-go-linux
+        fi
+        cd "${origDir}"
     else
         echo "export STT_SERVICE=coqui" >> ./chipper/source.sh
         if [[ ! -f ./stt/completed ]]; then
@@ -590,6 +639,9 @@ function setupSystemd() {
         export CGO_LDFLAGS="-L$(pwd)/../whisper.cpp"
         export CGO_CFLAGS="-I$(pwd)/../whisper.cpp"
         /usr/local/go/bin/go build -tags $GOTAGS -ldflags="${GOLDFLAGS}" cmd/experimental/whisper.cpp/main.go
+        elif [[ ${STT_SERVICE} == "sherpa-onnx" ]]; then
+        echo "wire-pod.service created, building chipper with Sherpa-Onnx STT service..."
+        /usr/local/go/bin/go build -tags $GOTAGS -ldflags="${GOLDFLAGS}" cmd/sherpa-onnx/main.go
     else
         echo "wire-pod.service created, building chipper with Coqui STT service..."
         export CGO_LDFLAGS="-L/root/.coqui/"

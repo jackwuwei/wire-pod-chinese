@@ -240,8 +240,17 @@ func handleSetSTTInfo(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "language not valid", http.StatusBadRequest)
 			return
 		}
+	} else if vars.APIConfig.STT.Service == "sherpa-onnx" {
+		if !isValidLanguage(request.Language, localization.ValidSenseVoiceLanguages) {
+			http.Error(w, "language not valid", http.StatusBadRequest)
+			return
+		}
+		if !sherpaModelPresent() {
+			http.Error(w, "sherpa-onnx SenseVoice model not found at "+vars.SherpaOnnxModelPath+"sense-voice/", http.StatusFailedDependency)
+			return
+		}
 	} else {
-		http.Error(w, "service must be vosk or whisper", http.StatusBadRequest)
+		http.Error(w, "service must be vosk, whisper, or sherpa-onnx", http.StatusBadRequest)
 		return
 	}
 	vars.APIConfig.STT.Language = request.Language
@@ -514,4 +523,13 @@ func isDownloadedLanguage(language string, downloadedLanguages []string) bool {
 		}
 	}
 	return false
+}
+
+func sherpaModelPresent() bool {
+	modelDir := os.Getenv("SHERPA_MODEL_DIR")
+	if modelDir == "" {
+		modelDir = "sense-voice"
+	}
+	_, err := os.Stat(filepath.Join(vars.SherpaOnnxModelPath, modelDir, "model.int8.onnx"))
+	return err == nil
 }

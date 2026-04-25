@@ -152,8 +152,9 @@
 		"keyphrases" : ["喜欢", "爱" ]
 	},
 	{	
-		"name": "intent_knowledge_promptquestion", 
-		"keyphrases" : ["问题", "回答" ]
+		"name": "intent_knowledge_promptquestion",
+		"keyphrases" : ["问题", "回答" ],
+		"requiresexact": true
 	},
 	{	
 		"name": "intent_clock_checktimer", 

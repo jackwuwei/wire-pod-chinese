@@ -4,6 +4,10 @@ import "github.com/kercre123/wire-pod/chipper/pkg/vars"
 
 var ValidVoskModels []string = []string{"en-US", "it-IT", "es-ES", "fr-FR", "de-DE", "pt-BR", "pl-PL", "zh-CN", "tr-TR", "ru-RU", "nt-NL", "uk-UA", "vi-VN", "ko-KR"}
 
+// SenseVoice ships one multilingual model; this list is the subset of locales we expose in the
+// web UI (each one also has a matching intent-data/*.json).
+var ValidSenseVoiceLanguages []string = []string{"en-US", "zh-CN", "ko-KR"}
+
 const STR_WEATHER_IN = "str_weather_in"
 const STR_WEATHER_FORECAST = "str_weather_forecast"
 const STR_WEATHER_TOMORROW = "str_weather_tomorrow"
@@ -252,7 +256,8 @@ func GetText(key string) string {
 }
 
 func ReloadVosk() {
-	if vars.APIConfig.STT.Service == "vosk" || vars.APIConfig.STT.Service == "whisper.cpp" {
+	switch vars.APIConfig.STT.Service {
+	case "vosk", "whisper.cpp", "sherpa-onnx":
 		vars.IntentList, _ = vars.LoadIntents()
 		vars.SttInitFunc()
 	}

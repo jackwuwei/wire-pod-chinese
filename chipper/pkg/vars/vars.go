@@ -42,6 +42,7 @@ var (
 	PodName           string = "wire-pod"
 	VoskModelPath     string = "../vosk/models/"
 	WhisperModelPath  string = "../whisper.cpp/models/"
+	SherpaOnnxModelPath string = "../sherpa-onnx/models/"
 	SessionCertPath   string = "./session-certs/"
 	VersionFile       string = "./version"
 )
@@ -173,6 +174,7 @@ func Init() {
 		BotInfoPath = JdocsDir + "/" + BotInfoName
 		VoskModelPath = join(podDir, "./vosk/models/")
 		WhisperModelPath = join(filepath.Dir(appDir), "/../Frameworks/chipper/whisper.cpp/models/") // macos
+		SherpaOnnxModelPath = join(podDir, "./sherpa-onnx/models/")
 		ApiConfigPath = join(podDir, ApiConfigPath)
 		CertPath = join(podDir, "./certs/cert.crt")
 		KeyPath = join(podDir, "./certs/cert.key")

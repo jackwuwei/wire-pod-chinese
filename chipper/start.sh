@@ -97,6 +97,12 @@ if [[ ${STT_SERVICE} == "leopard" ]]; then
         export LD_LIBRARY_PATH="/root/.vosk/libvosk:$HOME/.vosk/libvosk:$LD_LIBRARY_PATH"
         /usr/local/go/bin/go run -tags $GOTAGS -ldflags="${GOLDFLAGS}" -exec "env DYLD_LIBRARY_PATH=$HOME/.vosk/libvosk" cmd/vosk/main.go
     fi
+    elif [[ ${STT_SERVICE} == "sherpa-onnx" ]]; then
+    if [[ -f ./chipper ]]; then
+        ./chipper
+    else
+        /usr/local/go/bin/go run -tags $GOTAGS -ldflags="${GOLDFLAGS}" cmd/sherpa-onnx/main.go
+    fi
 else
     if [[ -f ./chipper ]]; then
         export CGO_LDFLAGS="-L/root/.coqui/"

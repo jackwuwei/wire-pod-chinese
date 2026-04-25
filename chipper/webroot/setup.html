@@ -184,6 +184,30 @@
               </span>
             </div>
 
+            <hr class="small-hr">
+            <label for="ttsProvider">TTS Provider:</label>
+            <select name="ttsProvider" id="ttsProvider" form="kgAPIAddForm" onchange="checkTTSProvider()">
+              <option value="" selected>Auto (Vector voice; OpenAI for non-English when LLM is OpenAI)</option>
+              <option value="vector">Vector built-in voice (English only)</option>
+              <option value="openai">OpenAI TTS</option>
+              <option value="edge-tts">Edge-TTS (Microsoft, free, supports Chinese)</option>
+            </select>
+            <span id="edgeTTSInput" style="display: none">
+              <small class="desc">Edge-TTS uses Microsoft Edge's online TTS service.
+                No API key needed. Network access to speech.platform.bing.com is required.</small><br />
+              <label for="edgeTTSVoice">Edge-TTS voice:</label>
+              <select name="edgeTTSVoice" id="edgeTTSVoice">
+                <option value="zh-CN-XiaoxiaoNeural" selected>zh-CN-XiaoxiaoNeural (Chinese, female)</option>
+                <option value="zh-CN-YunxiNeural">zh-CN-YunxiNeural (Chinese, male)</option>
+                <option value="zh-CN-XiaoyiNeural">zh-CN-XiaoyiNeural (Chinese, female)</option>
+                <option value="zh-CN-YunjianNeural">zh-CN-YunjianNeural (Chinese, male)</option>
+                <option value="zh-CN-XiaomengNeural">zh-CN-XiaomengNeural (Chinese, female)</option>
+                <option value="zh-TW-HsiaoChenNeural">zh-TW-HsiaoChenNeural (Taiwanese, female)</option>
+                <option value="en-US-AriaNeural">en-US-AriaNeural (English, female)</option>
+                <option value="en-US-GuyNeural">en-US-GuyNeural (English, male)</option>
+                <option value="ja-JP-NanamiNeural">ja-JP-NanamiNeural (Japanese, female)</option>
+              </select>
+            </span>
           </form>
         </div>
         <hr class="small-hr">

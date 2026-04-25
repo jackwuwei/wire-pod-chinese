@@ -281,6 +281,11 @@ function checkKG() {
   }
 }
 
+function checkTTSProvider() {
+  const ttsProvider = getE("ttsProvider").value;
+  getE("edgeTTSInput").style.display = ttsProvider === "edge-tts" ? "block" : "none";
+}
+
 function sendKGAPIKey() {
   const provider = getE("kgProvider").value;
   const data = {
@@ -294,6 +299,8 @@ function sendKGAPIKey() {
     openai_prompt: "",
     openai_voice: "",
     openai_voice_with_english: false,
+    tts_provider: "",
+    edge_tts_voice: "",
     save_chat: false,
     commands_enable: false,
     endpoint: "",
@@ -328,6 +335,9 @@ function sendKGAPIKey() {
   } else {
     data.enable = false;
   }
+
+  data.tts_provider = getE("ttsProvider").value;
+  data.edge_tts_voice = getE("edgeTTSVoice").value;
 
   fetch("/api/set_kg_api", {
     method: "POST",
@@ -386,6 +396,11 @@ function updateKGAPI() {
         getE("houndID").value = data.id;
         getE("intentyes").checked = data.intentgraph
       }
+      getE("ttsProvider").value = data.tts_provider || "";
+      if (data.edge_tts_voice) {
+        getE("edgeTTSVoice").value = data.edge_tts_voice;
+      }
+      checkTTSProvider();
       checkKG();
     });
 }
@@ -577,8 +592,8 @@ function showLanguage() {
   fetch("/api/get_stt_info")
     .then((response) => response.json())
     .then((parsed) => {
-      if (parsed.provider !== "vosk" && parsed.provider !== "whisper.cpp") {
-        displayError("languageStatus", `To set the STT language, the provider must be Vosk or Whisper. The current one is '${parsed.sttProvider}'.`);
+      if (parsed.provider !== "vosk" && parsed.provider !== "whisper.cpp" && parsed.provider !== "sherpa-onnx") {
+        displayError("languageStatus", `To set the STT language, the provider must be Vosk, Whisper, or Sherpa-Onnx. The current one is '${parsed.sttProvider}'.`);
         getE("languageSelectionDiv").style.display = "none";
       } else {
         getE("languageSelectionDiv").style.display = "block";

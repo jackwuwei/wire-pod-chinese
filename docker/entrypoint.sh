@@ -81,6 +81,7 @@ persist_directories() {
     link_dir stt
     link_dir vosk
     link_dir whisper.cpp
+    link_dir sherpa-onnx
     link_dir vector-cloud/build
     link_dir chipper/jdocs
     link_dir chipper/plugins
@@ -138,10 +139,6 @@ apply_env_overrides() {
 
 persist_directories
 persist_files
-
-if [ ! -e /root/.vosk ]; then
-    ln -sfn /opt/vosk /root/.vosk
-fi
 
 apply_env_overrides
 

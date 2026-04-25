@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"unicode"
 
 	pb "github.com/digital-dream-labs/api/go/chipperpb"
 	"github.com/kercre123/wire-pod/chipper/pkg/logger"
@@ -13,6 +14,26 @@ import (
 	"github.com/kercre123/wire-pod/chipper/pkg/vars"
 	"github.com/kercre123/wire-pod/chipper/pkg/vtt"
 )
+
+// isUnreliableSubstringKeyphrase reports whether a keyphrase is too short to
+// match reliably as a substring. CJK scripts have no word boundaries, so a
+// single ideograph like "是" or "不" appears inside countless unrelated
+// utterances ("我是杰克", "不知道") and would shadow the LLM fallback. The
+// exact-match pass still handles the case where the user really did say only
+// the one character.
+func isUnreliableSubstringKeyphrase(s string) bool {
+	runes := []rune(s)
+	if len(runes) >= 2 {
+		return false
+	}
+	for _, r := range runes {
+		if unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hangul, r) ||
+			unicode.Is(unicode.Hiragana, r) || unicode.Is(unicode.Katakana, r) {
+			return true
+		}
+	}
+	return false
+}
 
 type systemIntentResponseStruct struct {
 	Status       string `json:"status"`
@@ -289,6 +310,9 @@ func ProcessTextAll(req interface{}, voiceText string, intents []vars.JsonIntent
 			matched = 0
 			for _, b := range intents {
 				for _, c := range b.Keyphrases {
+					if isUnreliableSubstringKeyphrase(c) {
+						continue
+					}
 					if strings.Contains(voiceText, strings.ToLower(c)) && !b.RequireExactMatch {
 						logger.Println("Bot " + botSerial + " Partial match for intent " + b.Name + " (" + strings.ToLower(c) + ")")
 						if isOpus {

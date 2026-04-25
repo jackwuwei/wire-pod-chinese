@@ -149,8 +149,48 @@ func ModelIsSupported(cmd LLMCommand, model string) bool {
 	return false
 }
 
+// languageNameForPrompt maps the STT language code to a language name the LLM
+// can reliably interpret. Returns "" for unknown codes so the caller can skip
+// the instruction rather than guess.
+func languageNameForPrompt(code string) string {
+	switch code {
+	case "en-US", "":
+		return "English"
+	case "it-IT":
+		return "Italian"
+	case "es-ES":
+		return "Spanish"
+	case "fr-FR":
+		return "French"
+	case "de-DE":
+		return "German"
+	case "pt-BR":
+		return "Brazilian Portuguese"
+	case "pl-PL":
+		return "Polish"
+	case "zh-CN":
+		return "Simplified Chinese"
+	case "tr-TR":
+		return "Turkish"
+	case "ru-RU":
+		return "Russian"
+	case "nt-NL":
+		return "Dutch"
+	case "uk-UA":
+		return "Ukrainian"
+	case "vi-VN":
+		return "Vietnamese"
+	case "ko-KR":
+		return "Korean"
+	}
+	return ""
+}
+
 func CreatePrompt(origPrompt string, model string, isKG bool) string {
 	prompt := origPrompt + "\n\n" + "Keep in mind, user input comes from speech-to-text software, so respond accordingly. No special characters, especially these: & ^ * # @ - . No lists. No formatting."
+	if lang := languageNameForPrompt(vars.APIConfig.STT.Language); lang != "" {
+		prompt = prompt + "\n\n" + "Always respond in " + lang + ", regardless of the language of the system prompt. The user is speaking " + lang + "."
+	}
 	if vars.APIConfig.Knowledge.CommandsEnable {
 		prompt = prompt + "\n\n" + "You are running ON an Anki Vector robot. You have a set of commands. If you include an emoji, I will make you start over. If you want to use a command but it doesn't exist or your desired parameter isn't in the list, avoid using the command. The format is {{command||parameter}}. You can embed these in sentences. Example: \"User: How are you feeling? | Response: \"{{playAnimationWI||sad}} I'm feeling sad...\". Square brackets ([]) are not valid.\n\nUse the playAnimation or playAnimationWI commands if you want to express emotion! You are very animated and good at following instructions. Animation takes precendence over words. You are to include many animations in your response.\n\nHere is every valid command:"
 		for _, cmd := range ValidLLMCommands {
@@ -290,9 +330,19 @@ func DoSayText(input string, robot *vector.Vector) error {
 	// just before vector speaks
 	removeSpecialCharacters(input)
 
-	if (vars.APIConfig.STT.Language != "en-US" && vars.APIConfig.Knowledge.Provider == "openai") || vars.APIConfig.Knowledge.OpenAIVoiceWithEnglish {
-		err := DoSayText_OpenAI(robot, input)
-		return err
+	switch vars.APIConfig.Knowledge.TTSProvider {
+	case "edge-tts":
+		return DoSayText_EdgeTTS(robot, input)
+	case "openai":
+		return DoSayText_OpenAI(robot, input)
+	case "vector":
+		// fall through to built-in voice
+	default:
+		// legacy behavior: route non-English through OpenAI TTS when the LLM
+		// provider is OpenAI, or when the user opted in for English too.
+		if (vars.APIConfig.STT.Language != "en-US" && vars.APIConfig.Knowledge.Provider == "openai") || vars.APIConfig.Knowledge.OpenAIVoiceWithEnglish {
+			return DoSayText_OpenAI(robot, input)
+		}
 	}
 	robot.Conn.SayText(
 		context.Background(),
