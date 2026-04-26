@@ -112,6 +112,48 @@ update_export() {
     fi
 }
 
+ensure_sherpa_model() {
+    local model_root="${DATA_ROOT}/sherpa-onnx/models"
+    local model_dir="${model_root}/sense-voice"
+    local model_name="${SHERPA_MODEL_NAME:-sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17}"
+
+    if [ -d "${model_dir}" ] && [ -n "$(ls -A "${model_dir}" 2>/dev/null)" ]; then
+        echo "[entrypoint] sherpa model present at ${model_dir}"
+        return 0
+    fi
+
+    echo "[entrypoint] downloading sherpa model ${model_name}..."
+    mkdir -p "${model_root}"
+    cd "${model_root}"
+    rm -f model.tar.bz2
+
+    local urls=(
+        "https://gh-proxy.com/https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/${model_name}.tar.bz2"
+        "https://kkgithub.com/k2-fsa/sherpa-onnx/releases/download/asr-models/${model_name}.tar.bz2"
+        "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/${model_name}.tar.bz2"
+    )
+
+    for url in "${urls[@]}"; do
+        echo "[entrypoint] trying ${url}"
+        if curl -fSL --connect-timeout 30 --retry 1 -o model.tar.bz2 "${url}"; then
+            echo "[entrypoint] downloaded model from ${url}"
+            break
+        fi
+        rm -f model.tar.bz2
+    done
+
+    if [ ! -s model.tar.bz2 ]; then
+        echo "[entrypoint] all sherpa model mirrors failed" >&2
+        exit 1
+    fi
+
+    tar -xjf model.tar.bz2
+    rm model.tar.bz2
+    rm -rf "${model_dir}"
+    mv "${model_name}" sense-voice
+    echo "[entrypoint] sherpa model installed at ${model_dir}"
+}
+
 apply_env_overrides() {
     local source_file="${APP_ROOT}/chipper/source.sh"
 
@@ -139,6 +181,8 @@ apply_env_overrides() {
 
 persist_directories
 persist_files
+
+ensure_sherpa_model
 
 apply_env_overrides
 

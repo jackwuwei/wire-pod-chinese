@@ -351,7 +351,21 @@ func StreamingKGSim(req interface{}, esn string, transcribedText string, isKG bo
 					fullfullRespText = fullfullRespText + tail
 					fullRespText = fullRespText + tail
 				}
-				// prevents a crash
+				// Flush the trailing remainder that never hit a sentence-splitting
+				// punctuation mark (short answers, CJK-only punctuation like 。？！,
+				// or LLMs that don't end with a period).
+				if remainder := strings.TrimSpace(fullRespText); remainder != "" {
+					fullRespSlice = append(fullRespSlice, remainder)
+					fullRespText = ""
+					select {
+					case successIntent <- true:
+					default:
+					}
+					select {
+					case speakReady <- remainder:
+					default:
+					}
+				}
 				if len(fullRespSlice) == 0 {
 					logger.Println("LLM returned no response")
 					successIntent <- false
@@ -367,18 +381,12 @@ func StreamingKGSim(req interface{}, esn string, transcribedText string, isKG bo
 					break
 				}
 				isDone = true
-				// if fullRespSlice != fullRespText, add that missing bit to fullRespSlice
 				newStr := fullRespSlice[0]
 				for i, str := range fullRespSlice {
 					if i == 0 {
 						continue
 					}
 					newStr = newStr + " " + str
-				}
-				if strings.TrimSpace(newStr) != strings.TrimSpace(fullfullRespText) {
-					logger.Println("LLM debug: there is content after the last punctuation mark")
-					extraBit := strings.TrimPrefix(fullRespText, newStr)
-					fullRespSlice = append(fullRespSlice, extraBit)
 				}
 				if vars.APIConfig.Knowledge.SaveChat {
 					Remember(openai.ChatCompletionMessage{

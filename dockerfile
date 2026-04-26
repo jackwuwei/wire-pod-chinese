@@ -6,7 +6,6 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
 ARG SHERPA_ONNX_VERSION=1.12.40
-ARG SHERPA_MODEL=sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17
 ARG COMMIT_SHA=unknown
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -75,25 +74,6 @@ COPY . .
 
 RUN find . -type f -name '*.sh' -exec sed -i 's/\r$//' {} +
 
-# Sherpa-Onnx SenseVoice model (one model handles zh/en/ja/ko/yue)
-RUN set -eux; \
-    mkdir -p /opt/sherpa-onnx/models; \
-    cd /opt/sherpa-onnx/models; \
-    for url in \
-        "https://gh-proxy.com/https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/${SHERPA_MODEL}.tar.bz2" \
-        "https://kkgithub.com/k2-fsa/sherpa-onnx/releases/download/asr-models/${SHERPA_MODEL}.tar.bz2" \
-        "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/${SHERPA_MODEL}.tar.bz2"; do \
-        echo "Trying $url"; \
-        if curl -fsSL --connect-timeout 30 --retry 1 -o model.tar.bz2 "$url"; then \
-            echo "Downloaded model from $url"; break; \
-        fi; \
-        rm -f model.tar.bz2; \
-    done; \
-    test -s model.tar.bz2 || { echo "all sherpa model mirrors failed" >&2; exit 1; }; \
-    tar -xjf model.tar.bz2; \
-    rm model.tar.bz2; \
-    mv "${SHERPA_MODEL}" sense-voice
-
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     set -eux; \
@@ -149,6 +129,7 @@ RUN apt-get update \
         avahi-daemon \
         avahi-utils \
         bash \
+        bzip2 \
         ca-certificates \
         curl \
         git \
@@ -172,7 +153,6 @@ WORKDIR /opt/wire-pod
 COPY --from=builder /src /opt/wire-pod
 COPY --from=builder /build/chipper /opt/wire-pod/chipper/chipper
 COPY --from=builder /build/.wirepod-version /opt/wire-pod/.wirepod-version
-COPY --from=builder /opt/sherpa-onnx/models /opt/wire-pod/sherpa-onnx/models
 
 # The sherpa-onnx binary embeds an absolute rpath pointing into the builder's GOMODCACHE.
 # Re-create that path in the runtime image so libsherpa-onnx-c-api.so / libonnxruntime.so resolve.

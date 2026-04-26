@@ -17,6 +17,7 @@ vosk
 stt
 whisper.cpp
 vector-cloud/build
+chipper/.venv
 chipper/session-certs
 chipper/jdocs
 chipper/apiConfig.json

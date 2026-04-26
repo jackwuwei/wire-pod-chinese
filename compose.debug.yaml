@@ -1,0 +1,12 @@
+services:
+  wire-pod:
+    volumes:
+      - /home/jack/wire-pod-debug:/opt/wire-pod-debug
+      - wire-pod-debug-tools:/opt/dev-tools
+    command: ["tail", "-f", "/dev/null"]
+    healthcheck:
+      disable: true
+
+volumes:
+  wire-pod-debug-tools:
+    driver: local
