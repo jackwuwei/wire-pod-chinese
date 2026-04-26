@@ -177,6 +177,84 @@ func stripThinkBlocks() func(chunk string, final bool) string {
 	}
 }
 
+// hasReadableContent reports whether s contains any character a TTS engine
+// would actually pronounce. Inputs that are purely punctuation/whitespace
+// (e.g. a stray '"' that the LLM wrapped around its whole response, or a
+// standalone "..." chunk produced when consecutive ellipses arrive) cause
+// edge-tts to return NoAudioReceived, so they should be filtered upstream.
+func hasReadableContent(s string) bool {
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return true
+		}
+	}
+	return false
+}
+
+// findSentenceEnd returns the byte index immediately after the first complete
+// sentence terminator in s, or -1 if no terminator is found yet (caller should
+// wait for more streamed text). Recognized terminators:
+//   - 。 ？ ！ : always
+//   - ?  !     : always (consecutive runs like "?!" or "!!" are kept together)
+//   - ...      : as a unit (treated as a single ellipsis terminator)
+//   - .        : only when prev rune is not a digit AND next rune is whitespace
+//                or end-of-string. Bare '.' at the buffer tail returns -1 so
+//                the caller can wait one more rune to disambiguate "1." from
+//                "end."  (Same lookahead applies to ".." which could become
+//                "..." or just "..X").
+func findSentenceEnd(s string) int {
+	type rp struct {
+		r        rune
+		startPos int // byte index of this rune in s
+		endPos   int // byte index immediately after this rune
+	}
+	var rs []rp
+	for i, r := range s {
+		size := len(string(r))
+		rs = append(rs, rp{r: r, startPos: i, endPos: i + size})
+	}
+	for i := 0; i < len(rs); i++ {
+		switch rs[i].r {
+		case '。', '？', '！':
+			return rs[i].endPos
+		case '?', '!':
+			j := i
+			for j+1 < len(rs) && (rs[j+1].r == '?' || rs[j+1].r == '!') {
+				j++
+			}
+			return rs[j].endPos
+		case '.':
+			// "..." as a unit
+			if i+2 < len(rs) && rs[i+1].r == '.' && rs[i+2].r == '.' {
+				return rs[i+2].endPos
+			}
+			// ".." at tail: could become "..." once one more rune arrives
+			if i+1 < len(rs) && rs[i+1].r == '.' && i+2 == len(rs) {
+				return -1
+			}
+			// bare '.' at tail: need lookahead to know if it's end-of-sentence
+			// or "1." / "v1.0" pattern
+			if i+1 == len(rs) {
+				return -1
+			}
+			next := rs[i+1].r
+			// followed by alphanumeric → likely decimal/abbrev/domain, skip
+			if (next >= '0' && next <= '9') || (next >= 'a' && next <= 'z') || (next >= 'A' && next <= 'Z') {
+				continue
+			}
+			// preceded by a digit → numbered list ("1. ") or trailing decimal,
+			// skip
+			if i > 0 {
+				if prev := rs[i-1].r; prev >= '0' && prev <= '9' {
+					continue
+				}
+			}
+			return rs[i].endPos
+		}
+	}
+	return -1
+}
+
 func removeEmojis(input string) string {
 	// a mess, but it works!
 	re := regexp.MustCompile(`[\x{1F600}-\x{1F64F}]|[\x{1F300}-\x{1F5FF}]|[\x{1F680}-\x{1F6FF}]|[\x{1F1E0}-\x{1F1FF}]|[\x{2600}-\x{26FF}]|[\x{2700}-\x{27BF}]|[\x{1F900}-\x{1F9FF}]|[\x{1F004}]|[\x{1F0CF}]|[\x{1F18E}]|[\x{1F191}-\x{1F251}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]|[\x{1F004}-\x{1F0CF}]|[\x{1F191}-\x{1F251}]|[\x{2B50}]`)
@@ -420,30 +498,26 @@ func StreamingKGSim(req interface{}, esn string, transcribedText string, isKG bo
 			}
 			fullfullRespText = fullfullRespText + delta
 			fullRespText = fullRespText + delta
-			if strings.Contains(fullRespText, "...") || strings.Contains(fullRespText, ".'") || strings.Contains(fullRespText, ".\"") || strings.Contains(fullRespText, ".") || strings.Contains(fullRespText, "?") || strings.Contains(fullRespText, "!") {
-				var sepStr string
-				if strings.Contains(fullRespText, "...") {
-					sepStr = "..."
-				} else if strings.Contains(fullRespText, ".'") {
-					sepStr = ".'"
-				} else if strings.Contains(fullRespText, ".\"") {
-					sepStr = ".\""
-				} else if strings.Contains(fullRespText, ".") {
-					sepStr = "."
-				} else if strings.Contains(fullRespText, "?") {
-					sepStr = "?"
-				} else if strings.Contains(fullRespText, "!") {
-					sepStr = "!"
+			// Drain every complete sentence currently in the buffer. A single
+			// delta can contain multiple sentence terminators, so loop until
+			// findSentenceEnd reports nothing left to flush.
+			for {
+				end := findSentenceEnd(fullRespText)
+				if end < 0 {
+					break
 				}
-				splitResp := strings.Split(strings.TrimSpace(fullRespText), sepStr)
-				fullRespSlice = append(fullRespSlice, strings.TrimSpace(splitResp[0])+sepStr)
-				fullRespText = splitResp[1]
+				sentence := strings.TrimSpace(fullRespText[:end])
+				fullRespText = fullRespText[end:]
+				if sentence == "" {
+					continue
+				}
+				fullRespSlice = append(fullRespSlice, sentence)
 				select {
 				case successIntent <- true:
 				default:
 				}
 				select {
-				case speakReady <- strings.TrimSpace(splitResp[0]) + sepStr:
+				case speakReady <- sentence:
 				default:
 				}
 			}
@@ -517,31 +591,35 @@ func StreamingKGSim(req interface{}, esn string, transcribedText string, isKG bo
 			}()
 		}
 		var disconnect bool
-		numInResp := 0
-		for {
-			respSlice := fullRespSlice
-			if len(respSlice)-1 < numInResp {
-				if !isDone {
-					logger.Println("Waiting for more content from LLM...")
-					for range speakReady {
-						respSlice = fullRespSlice
+		if vars.APIConfig.Knowledge.TTSProvider == "edge-tts" {
+			disconnect = runEdgeTTSPipeline(robot, &fullRespSlice, &fullRespText, &isDone, &interrupted, speakReady, stopStop, nChat)
+		} else {
+			numInResp := 0
+			for {
+				respSlice := fullRespSlice
+				if len(respSlice)-1 < numInResp {
+					if !isDone {
+						logger.Println("Waiting for more content from LLM...")
+						for range speakReady {
+							respSlice = fullRespSlice
+							break
+						}
+					} else {
 						break
 					}
-				} else {
+				}
+				if interrupted {
 					break
 				}
+				logger.Println(respSlice[numInResp])
+				acts := GetActionsFromString(respSlice[numInResp])
+				nChat[len(nChat)-1].Content = fullRespText
+				disconnect = PerformActions(nChat, acts, robot, stopStop)
+				if disconnect {
+					break
+				}
+				numInResp = numInResp + 1
 			}
-			if interrupted {
-				break
-			}
-			logger.Println(respSlice[numInResp])
-			acts := GetActionsFromString(respSlice[numInResp])
-			nChat[len(nChat)-1].Content = fullRespText
-			disconnect = PerformActions(nChat, acts, robot, stopStop)
-			if disconnect {
-				break
-			}
-			numInResp = numInResp + 1
 		}
 		if !vars.APIConfig.Knowledge.CommandsEnable {
 			stopTTSLoop = true
@@ -568,6 +646,108 @@ func StreamingKGSim(req interface{}, esn string, transcribedText string, isKG bo
 		}
 	}
 	return "", nil
+}
+
+// runEdgeTTSPipeline drives the playback loop for the edge-tts provider with
+// a single-producer / single-consumer pipeline so that the next sentence is
+// being synthesized while the current one is playing on the robot.
+//
+// It mirrors the synchronous PerformActions branch in side effects (animation
+// dispatch, getImage / newRequest disconnect signaling, behavior queue wait)
+// but moves the slow synthEdgeTTS call off the playback critical path.
+func runEdgeTTSPipeline(
+	robot *vector.Vector,
+	fullRespSlice *[]string,
+	fullRespText *string,
+	isDone *bool,
+	interrupted *bool,
+	speakReady chan string,
+	stopStop chan bool,
+	nChat []openai.ChatCompletionMessage,
+) bool {
+	type prepared struct {
+		act      RobotAction
+		audio    [][]byte
+		synthErr error
+	}
+	prepChan := make(chan prepared, 2)
+
+	go func() {
+		defer close(prepChan)
+		numInResp := 0
+		for {
+			respSlice := *fullRespSlice
+			if len(respSlice)-1 < numInResp {
+				if !*isDone {
+					logger.Println("Waiting for more content from LLM...")
+					for range speakReady {
+						break
+					}
+					continue
+				}
+				return
+			}
+			if *interrupted {
+				return
+			}
+			chunk := respSlice[numInResp]
+			logger.Println(chunk)
+			for _, a := range GetActionsFromString(chunk) {
+				if *interrupted {
+					return
+				}
+				if a.Action == ActionSayText {
+					if !hasReadableContent(a.Parameter) {
+						continue
+					}
+					audio, err := synthEdgeTTS(a.Parameter)
+					prepChan <- prepared{act: a, audio: audio, synthErr: err}
+				} else {
+					prepChan <- prepared{act: a}
+				}
+			}
+			numInResp++
+		}
+	}()
+
+	disconnect := false
+	for p := range prepChan {
+		if *interrupted {
+			break
+		}
+		nChat[len(nChat)-1].Content = *fullRespText
+		switch {
+		case p.act.Action == ActionSayText:
+			if p.synthErr != nil {
+				logger.Println("edge-tts synth failed (skipping): " + p.synthErr.Error())
+				continue
+			}
+			playEdgeTTSAudio(robot, p.audio)
+		case p.act.Action == ActionPlayAnimation:
+			DoPlayAnimation(p.act.Parameter, robot)
+		case p.act.Action == ActionPlayAnimationWI:
+			// In the pipelined path PlayAnimationWI must run synchronously:
+			// Vector cancels in-flight ExternalAudioStreamPlayback when a new
+			// animation starts, so the original fire-and-forget goroutine
+			// races against the next sentence's playback and silently kills
+			// it. Without the synthesis-latency buffer of the synchronous
+			// path, that race is reliably lost.
+			DoPlayAnimation(p.act.Parameter, robot)
+		case p.act.Action == ActionNewRequest:
+			go DoNewRequest(robot)
+			disconnect = true
+		case p.act.Action == ActionGetImage:
+			DoGetImage(nChat, p.act.Parameter, robot, stopStop)
+			disconnect = true
+		case p.act.Action == ActionPlaySound:
+			DoPlaySound(p.act.Parameter, robot)
+		}
+		if disconnect {
+			break
+		}
+	}
+	WaitForAnim_Queue(robot.Cfg.SerialNo)
+	return disconnect
 }
 
 func KGSim(esn string, textToSay string) error {
