@@ -42,3 +42,4 @@
 .DS_Store
 /chipper/openaiChats.json
 /.claude
+/scripts/debug/remote-setup.sh
