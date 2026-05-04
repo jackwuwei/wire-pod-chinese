@@ -333,6 +333,8 @@ func DoSayText(input string, robot *vector.Vector) error {
 	switch vars.APIConfig.Knowledge.TTSProvider {
 	case "edge-tts":
 		return DoSayText_EdgeTTS(robot, input)
+	case "gpt-sovits":
+		return DoSayText_SoVITS(robot, input)
 	case "openai":
 		return DoSayText_OpenAI(robot, input)
 	case "vector":

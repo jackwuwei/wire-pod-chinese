@@ -33,6 +33,13 @@ type apiConfig struct {
 		OpenAIVoiceWithEnglish bool    `json:"openai_voice_with_english"`
 		TTSProvider            string  `json:"tts_provider"`
 		EdgeTTSVoice           string  `json:"edge_tts_voice"`
+		SoVITSURL              string  `json:"sovits_url"`
+		SoVITSLang             string  `json:"sovits_lang"`
+		SoVITSRefAudio         string  `json:"sovits_ref_audio"`
+		SoVITSRefText          string  `json:"sovits_ref_text"`
+		SoVITSRefLang          string  `json:"sovits_ref_lang"`
+		SoVITSGainDB           float32 `json:"sovits_gain_db"`
+		SoVITSPeakDBFS         float32 `json:"sovits_peak_dbfs"`
 		SaveChat               bool    `json:"save_chat"`
 		CommandsEnable         bool    `json:"commands_enable"`
 		Endpoint               string  `json:"endpoint"`

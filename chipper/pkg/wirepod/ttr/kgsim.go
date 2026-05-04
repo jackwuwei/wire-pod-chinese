@@ -591,8 +591,13 @@ func StreamingKGSim(req interface{}, esn string, transcribedText string, isKG bo
 			}()
 		}
 		var disconnect bool
-		if vars.APIConfig.Knowledge.TTSProvider == "edge-tts" {
-			disconnect = runEdgeTTSPipeline(robot, &fullRespSlice, &fullRespText, &isDone, &interrupted, speakReady, stopStop, nChat)
+		ttsProv := vars.APIConfig.Knowledge.TTSProvider
+		if ttsProv == "edge-tts" || ttsProv == "gpt-sovits" {
+			synth := synthEdgeTTS
+			if ttsProv == "gpt-sovits" {
+				synth = synthSoVITS
+			}
+			disconnect = runStreamingTTSPipeline(synth, robot, &fullRespSlice, &fullRespText, &isDone, &interrupted, speakReady, stopStop, nChat)
 		} else {
 			numInResp := 0
 			for {
@@ -648,14 +653,19 @@ func StreamingKGSim(req interface{}, esn string, transcribedText string, isKG bo
 	return "", nil
 }
 
-// runEdgeTTSPipeline drives the playback loop for the edge-tts provider with
-// a single-producer / single-consumer pipeline so that the next sentence is
-// being synthesized while the current one is playing on the robot.
+// runStreamingTTSPipeline drives the playback loop for any synth-then-stream
+// TTS provider (edge-tts, gpt-sovits) with a single-producer/single-consumer
+// pipeline so that the next sentence is being synthesized while the current
+// one is playing on the robot.
 //
 // It mirrors the synchronous PerformActions branch in side effects (animation
 // dispatch, getImage / newRequest disconnect signaling, behavior queue wait)
-// but moves the slow synthEdgeTTS call off the playback critical path.
-func runEdgeTTSPipeline(
+// but moves the slow synth call off the playback critical path.
+//
+// The `synth` function takes a sentence and returns 16kHz mono PCM chunks
+// ready for ExternalAudioStreamPlayback.
+func runStreamingTTSPipeline(
+	synth func(string) ([][]byte, error),
 	robot *vector.Vector,
 	fullRespSlice *[]string,
 	fullRespText *string,
@@ -700,7 +710,7 @@ func runEdgeTTSPipeline(
 					if !hasReadableContent(a.Parameter) {
 						continue
 					}
-					audio, err := synthEdgeTTS(a.Parameter)
+					audio, err := synth(a.Parameter)
 					prepChan <- prepared{act: a, audio: audio, synthErr: err}
 				} else {
 					prepChan <- prepared{act: a}
@@ -719,7 +729,7 @@ func runEdgeTTSPipeline(
 		switch {
 		case p.act.Action == ActionSayText:
 			if p.synthErr != nil {
-				logger.Println("edge-tts synth failed (skipping): " + p.synthErr.Error())
+				logger.Println("tts synth failed (skipping): " + p.synthErr.Error())
 				continue
 			}
 			playEdgeTTSAudio(robot, p.audio)

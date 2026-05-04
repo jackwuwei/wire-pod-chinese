@@ -40,21 +40,40 @@ func int16sToBytes(data []int16) []byte {
 
 func downsample24kTo16k(input []byte) [][]byte {
 	outBytes := downsample24kTo16kLinear(input)
-	var audioChunks [][]byte
 	filteredBytes := lowPassFilter(outBytes, 4000, 16000)
 	iVolBytes := increaseVolume(filteredBytes, 5)
-	for len(iVolBytes) > 0 {
-		if len(iVolBytes) < 1024 {
-			chunk := make([]byte, 1024)
-			copy(chunk, iVolBytes)
-			audioChunks = append(audioChunks, chunk)
+	return chunkPCM16(iVolBytes, 1024)
+}
+
+// downsample32kTo16k decimates 2:1 with a low-pass filter to suppress
+// aliasing. Output is 16kHz mono PCM-16 chunked into 1024-byte frames ready
+// for ExternalAudioStreamPlayback. No volume boost — sovits/serve.py already
+// peak-normalizes and applies +9dB gain server-side.
+func downsample32kTo16k(input []byte) [][]byte {
+	filtered := lowPassFilter(input, 7000, 32000)
+	in16 := bytesToInt16s(filtered)
+	out16 := make([]int16, len(in16)/2)
+	for i := range out16 {
+		out16[i] = in16[i*2]
+	}
+	return chunkPCM16(int16sToBytes(out16), 1024)
+}
+
+// chunkPCM16 splits a PCM stream into chunks of `size` bytes, zero-padding
+// the final chunk if needed (Vector's audio handler expects fixed-size frames).
+func chunkPCM16(data []byte, size int) [][]byte {
+	var out [][]byte
+	for len(data) > 0 {
+		if len(data) < size {
+			chunk := make([]byte, size)
+			copy(chunk, data)
+			out = append(out, chunk)
 			break
 		}
-		audioChunks = append(audioChunks, iVolBytes[:1024])
-		iVolBytes = iVolBytes[1024:]
+		out = append(out, data[:size])
+		data = data[size:]
 	}
-
-	return audioChunks
+	return out
 }
 
 func increaseVolume(data []byte, factor float64) []byte {

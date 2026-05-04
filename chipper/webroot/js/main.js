@@ -284,6 +284,7 @@ function checkKG() {
 function checkTTSProvider() {
   const ttsProvider = getE("ttsProvider").value;
   getE("edgeTTSInput").style.display = ttsProvider === "edge-tts" ? "block" : "none";
+  getE("sovitsTTSInput").style.display = ttsProvider === "gpt-sovits" ? "block" : "none";
 }
 
 function sendKGAPIKey() {
@@ -301,6 +302,13 @@ function sendKGAPIKey() {
     openai_voice_with_english: false,
     tts_provider: "",
     edge_tts_voice: "",
+    sovits_url: "",
+    sovits_lang: "",
+    sovits_ref_audio: "",
+    sovits_ref_text: "",
+    sovits_ref_lang: "",
+    sovits_gain_db: 0,
+    sovits_peak_dbfs: 0,
     save_chat: false,
     commands_enable: false,
     endpoint: "",
@@ -338,6 +346,13 @@ function sendKGAPIKey() {
 
   data.tts_provider = getE("ttsProvider").value;
   data.edge_tts_voice = getE("edgeTTSVoice").value;
+  data.sovits_url = getE("sovitsURL").value;
+  data.sovits_lang = getE("sovitsLang").value;
+  data.sovits_ref_audio = getE("sovitsRefAudio").value;
+  data.sovits_ref_text = getE("sovitsRefText").value;
+  data.sovits_ref_lang = getE("sovitsRefLang").value;
+  data.sovits_gain_db = parseFloat(getE("sovitsGainDB").value) || 0;
+  data.sovits_peak_dbfs = parseFloat(getE("sovitsPeakDBFS").value) || 0;
 
   fetch("/api/set_kg_api", {
     method: "POST",
@@ -400,6 +415,13 @@ function updateKGAPI() {
       if (data.edge_tts_voice) {
         getE("edgeTTSVoice").value = data.edge_tts_voice;
       }
+      getE("sovitsURL").value = data.sovits_url || "";
+      getE("sovitsLang").value = data.sovits_lang || "";
+      getE("sovitsRefAudio").value = data.sovits_ref_audio || "";
+      getE("sovitsRefText").value = data.sovits_ref_text || "";
+      getE("sovitsRefLang").value = data.sovits_ref_lang || "";
+      getE("sovitsGainDB").value = data.sovits_gain_db || "";
+      getE("sovitsPeakDBFS").value = data.sovits_peak_dbfs || "";
       checkTTSProvider();
       checkKG();
     });

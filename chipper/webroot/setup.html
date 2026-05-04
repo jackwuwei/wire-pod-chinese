@@ -191,6 +191,7 @@
               <option value="vector">Vector built-in voice (English only)</option>
               <option value="openai">OpenAI TTS</option>
               <option value="edge-tts">Edge-TTS (Microsoft, free, supports Chinese)</option>
+              <option value="gpt-sovits">GPT-SoVITS (self-hosted, e.g. Vector-cloned voice)</option>
             </select>
             <span id="edgeTTSInput" style="display: none">
               <small class="desc">Edge-TTS uses Microsoft Edge's online TTS service.
@@ -207,6 +208,31 @@
                 <option value="en-US-GuyNeural">en-US-GuyNeural (English, male)</option>
                 <option value="ja-JP-NanamiNeural">ja-JP-NanamiNeural (Japanese, female)</option>
               </select>
+            </span>
+            <span id="sovitsTTSInput" style="display: none">
+              <small class="desc">Calls a self-hosted GPT-SoVITS HTTP server (FastAPI POST /tts).
+                The server returns 32kHz mono PCM-16 WAV; wire-pod resamples to 16kHz for the robot.
+                All ref_* fields are optional — if blank, server defaults are used.</small><br />
+              <label for="sovitsURL">Endpoint URL:</label>
+              <input type="text" id="sovitsURL" placeholder="http://192.168.50.48:8020/tts" /><br />
+              <label for="sovitsLang">Target language:</label>
+              <select id="sovitsLang">
+                <option value="" selected>(server default — usually 中英混合)</option>
+                <option value="中英混合">中英混合 (Chinese + English mixed)</option>
+                <option value="中文">中文</option>
+                <option value="英文">英文</option>
+                <option value="auto">auto</option>
+              </select><br />
+              <label for="sovitsRefAudio">Reference audio path (server-side):</label>
+              <input type="text" id="sovitsRefAudio" placeholder="(blank = server default)" /><br />
+              <label for="sovitsRefText">Reference text:</label>
+              <input type="text" id="sovitsRefText" placeholder="(blank = server default)" /><br />
+              <label for="sovitsRefLang">Reference language:</label>
+              <input type="text" id="sovitsRefLang" placeholder="en / 中文 / ... (blank = server default)" /><br />
+              <label for="sovitsGainDB">Gain (dB):</label>
+              <input type="number" step="0.5" id="sovitsGainDB" placeholder="0 = use server default (+9dB)" /><br />
+              <label for="sovitsPeakDBFS">Target peak (dBFS):</label>
+              <input type="number" step="0.1" id="sovitsPeakDBFS" placeholder="0 = use server default (-0.5)" />
             </span>
           </form>
         </div>
