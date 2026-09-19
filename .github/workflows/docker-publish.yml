@@ -76,3 +76,13 @@ jobs:
             PIP_INDEX_URL=https://pypi.org/simple/
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Update Docker Hub description
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ steps.image.outputs.name }}
+          short-description: Vector 说中文、听中文的 wire-pod：SenseVoice 识别 + edge-tts/GPT-SoVITS
+          readme-filepath: docker/DOCKERHUB.md
