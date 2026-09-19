@@ -615,7 +615,7 @@ function showLanguage() {
     .then((response) => response.json())
     .then((parsed) => {
       if (parsed.provider !== "vosk" && parsed.provider !== "whisper.cpp" && parsed.provider !== "sherpa-onnx") {
-        displayError("languageStatus", `To set the STT language, the provider must be Vosk, Whisper, or Sherpa-Onnx. The current one is '${parsed.sttProvider}'.`);
+        displayError("languageStatus", `To set the STT language, the provider must be Vosk, Whisper, or Sherpa-Onnx. The current one is '${parsed.provider}'.`);
         getE("languageSelectionDiv").style.display = "none";
       } else {
         getE("languageSelectionDiv").style.display = "block";

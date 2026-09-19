@@ -95,13 +95,15 @@ func WriteSTT() {
 	// was not part of the original code, so this is its own function
 	// launched if stt not found in config
 	APIConfig.STT.Service = os.Getenv("STT_SERVICE")
-	if os.Getenv("STT_SERVICE") == "vosk" || os.Getenv("STT_SERVICE") == "whisper.cpp" {
+	if os.Getenv("STT_SERVICE") == "vosk" || os.Getenv("STT_SERVICE") == "whisper.cpp" || os.Getenv("STT_SERVICE") == "sherpa-onnx" {
 		APIConfig.STT.Language = os.Getenv("STT_LANGUAGE")
 	}
 }
 
 func ReadConfig() {
-	if _, err := os.Stat(ApiConfigPath); err != nil {
+	// The docker entrypoint pre-creates an empty file so it can be symlinked
+	// into the data volume; treat that the same as a missing config.
+	if info, err := os.Stat(ApiConfigPath); err != nil || info.Size() == 0 {
 		CreateConfigFromEnv()
 		logger.Println("API config JSON created")
 	} else {
