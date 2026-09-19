@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: dockerfile
-    image: ghcr.io/kercre123/wire-pod:main
+    image: jackwuwei/wire-pod-chinese:latest
     restart: unless-stopped
     environment:
       WIREPOD_DATA_DIR: /data
