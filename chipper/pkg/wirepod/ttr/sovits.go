@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	sovitsDefaultURL  = "http://192.168.50.48:8020/tts"
+	sovitsDefaultURL  = "http://127.0.0.1:8020/tts"
 	sovitsDefaultLang = "中英混合"
 	// Long sentences on Pentium 8505 take ~14s wall for ~8s audio. Allow 60s
 	// to cover slowest case + some headroom; serve.py serializes via _lock so
