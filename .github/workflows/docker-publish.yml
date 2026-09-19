@@ -79,6 +79,8 @@ jobs:
 
       - name: Update Docker Hub description
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        # Needs a Docker Hub token with Read, Write, Delete scope; don't fail the release over it.
+        continue-on-error: true
         uses: peter-evans/dockerhub-description@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
