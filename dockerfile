@@ -7,13 +7,17 @@ ARG TARGETARCH
 ARG TARGETVARIANT
 ARG SHERPA_ONNX_VERSION=1.12.40
 ARG COMMIT_SHA=unknown
+# Set USE_CN_MIRROR=false when building outside mainland China (e.g. GitHub Actions).
+ARG USE_CN_MIRROR=true
+ARG GOPROXY=https://goproxy.cn,direct
 
 ENV DEBIAN_FRONTEND=noninteractive \
     CGO_ENABLED=1 \
-    GOPROXY=https://goproxy.cn,direct \
+    GOPROXY=${GOPROXY} \
     GOMODCACHE=/go/pkg/mod
 
 RUN set -eux; \
+    [ "${USE_CN_MIRROR}" = "true" ] || exit 0; \
     if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
         sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g; s|security.debian.org/debian-security|mirrors.tuna.tsinghua.edu.cn/debian-security|g' /etc/apt/sources.list.d/debian.sources; \
     fi; \
@@ -118,11 +122,13 @@ FROM ubuntu:22.04 AS runtime
 
 ARG SHERPA_ONNX_VERSION=1.12.40
 ARG COMMIT_SHA=unknown
+ARG USE_CN_MIRROR=true
+ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple/
 
 ENV DEBIAN_FRONTEND=noninteractive \
     WIREPOD_DATA_DIR=/data
 
-RUN sed -i 's|archive.ubuntu.com/ubuntu|mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|security.ubuntu.com/ubuntu|mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|ports.ubuntu.com/ubuntu-ports|mirrors.tuna.tsinghua.edu.cn/ubuntu-ports|g' /etc/apt/sources.list
+RUN [ "${USE_CN_MIRROR}" != "true" ] || sed -i 's|archive.ubuntu.com/ubuntu|mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|security.ubuntu.com/ubuntu|mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|ports.ubuntu.com/ubuntu-ports|mirrors.tuna.tsinghua.edu.cn/ubuntu-ports|g' /etc/apt/sources.list
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -159,8 +165,8 @@ COPY --from=builder /build/.wirepod-version /opt/wire-pod/.wirepod-version
 COPY --from=builder /build/sherpa-onnx-libs/ /go/pkg/mod/github.com/k2-fsa/sherpa-onnx-go-linux@v${SHERPA_ONNX_VERSION}/lib/
 
 RUN python3 -m venv /opt/wire-pod/chipper/.venv \
-    && /opt/wire-pod/chipper/.venv/bin/pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple/ --upgrade pip \
-    && /opt/wire-pod/chipper/.venv/bin/pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple/ edge-tts
+    && /opt/wire-pod/chipper/.venv/bin/pip install --no-cache-dir -i "${PIP_INDEX_URL}" --upgrade pip \
+    && /opt/wire-pod/chipper/.venv/bin/pip install --no-cache-dir -i "${PIP_INDEX_URL}" edge-tts
 
 RUN chmod +x \
         /opt/wire-pod/setup.sh \
