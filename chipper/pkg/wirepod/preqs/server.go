@@ -42,7 +42,7 @@ func ReloadVosk() {
 func New(InitFunc func() error, SttHandler interface{}, voiceProcessor string) (*Server, error) {
 
 	// Decide the TTS language
-	if voiceProcessor != "vosk" && voiceProcessor != "whisper.cpp" && voiceProcessor != "sherpa-onnx" {
+	if voiceProcessor != "vosk" && voiceProcessor != "whisper.cpp" && voiceProcessor != "whisper" && voiceProcessor != "sherpa-onnx" {
 		vars.APIConfig.STT.Language = "en-US"
 	}
 	sttLanguage = vars.APIConfig.STT.Language
