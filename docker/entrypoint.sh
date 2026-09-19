@@ -186,4 +186,8 @@ ensure_sherpa_model
 
 apply_env_overrides
 
+# ensure_sherpa_model cd's into the model dir on first boot; start.sh resolves
+# ./chipper and ./source.sh relative to the cwd.
+cd "${APP_ROOT}"
+
 exec "$@"
