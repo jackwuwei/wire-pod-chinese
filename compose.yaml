@@ -8,9 +8,12 @@ services:
     restart: unless-stopped
     environment:
       WIREPOD_DATA_DIR: /data
-    # host 网络：wire-pod 按连接来源记录机器人 IP，端口映射(NAT)会记成 Docker 网关，
-    # 导致 SDK 连回 wire-pod 自己（unknown service ExternalInterface）；mDNS 也需要 host 网络。
-    # 仅 Linux 宿主机有效，Docker Desktop (Windows/Mac) 不支持。
+    # Host networking is required. wire-pod records the robot's IP from the
+    # connection's source address; with bridge mode + port mapping that is the
+    # Docker gateway, so the SDK app dials wire-pod itself ("unknown service
+    # ExternalInterface"). mDNS (escapepod.local) also needs it. Ports 80, 443,
+    # 8080 and 8084 must be free on the host and can't be remapped.
+    # Linux hosts only; Docker Desktop (macOS/Windows) has no real host network.
     network_mode: host
     volumes:
       - wire-pod-data:/data
