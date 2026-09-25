@@ -1,7 +1,6 @@
 services:
   wire-pod:
     container_name: wire-pod
-    hostname: escapepod
     build:
       context: .
       dockerfile: dockerfile
@@ -9,11 +8,10 @@ services:
     restart: unless-stopped
     environment:
       WIREPOD_DATA_DIR: /data
-    ports:
-      - "80:80"
-      - "443:443"
-      - "8080:8080"
-      - "8084:8084"
+    # host 网络：wire-pod 按连接来源记录机器人 IP，端口映射(NAT)会记成 Docker 网关，
+    # 导致 SDK 连回 wire-pod 自己（unknown service ExternalInterface）；mDNS 也需要 host 网络。
+    # 仅 Linux 宿主机有效，Docker Desktop (Windows/Mac) 不支持。
+    network_mode: host
     volumes:
       - wire-pod-data:/data
       - wire-pod-images:/images
